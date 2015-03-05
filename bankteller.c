@@ -24,8 +24,7 @@ static p_teller teller_list = NULL;
 void teller_check_in(p_teller teller) 
 {
    teller->checked_in = 1; 
-   teller->doing_service = 0;
- 
+   teller->doing_service = 0; 
    // add teller to list
    pthread_mutex_lock(&mutex);
    if(teller_list == NULL){
@@ -44,28 +43,30 @@ void teller_check_in(p_teller teller)
 
 void teller_check_out(p_teller teller)
 {
-   // check if the teller is done
+  // check if the teller is done
    // if not, wait for teller to be done
    pthread_mutex_lock(&mutex);
-   //what do i put in the while statement?
    while(teller->doing_service){
       pthread_cond_wait(&teller->done, &mutex);
-   } 
+   }
+ 
    // remove teller from list
-   p_teller tmp;
-   tmp = teller_list;
-   if(tmp == teller){
-      teller_list = tmp->next;
-      tmp->next = NULL;
+   if(teller == teller_list){
+      teller_list = teller_list->next;
+      teller->next = NULL;
    }else{
+      //we have to search for it
+      p_teller tmp;
+      tmp = teller_list;
       while(tmp->next != teller){
-         tmp = tmp->next;
+      tmp =  tmp->next;
       }
       tmp->next = teller->next;
       teller->next = NULL;
    }
-   teller->checked_in = 0;
-   pthread_mutex_unlock(&mutex);     
+   pthread_mutex_unlock(&mutex);
+ 
+   teller->checked_in = 0; 
 }
 
 p_teller do_banking(int customer_id)
@@ -74,7 +75,7 @@ p_teller do_banking(int customer_id)
    // if not, wait for teller to become available 
    // TEST
    pthread_mutex_lock(&mutex);
-   while(!teller_list){
+   while(teller_list == NULL){
       pthread_cond_wait(&teller_available, &mutex);
    }
    //now we know that a teller is available
@@ -82,19 +83,22 @@ p_teller do_banking(int customer_id)
    teller = teller_list;
    teller_list = teller_list->next;
    teller->next = NULL;
-   teller->doing_service = 1;
    pthread_mutex_unlock(&mutex);
+   printf("Customer %d is served by teller %d\n", customer_id, teller->id);
+   teller->doing_service = 1;
 
    return teller;
 }
 
 void finish_banking(int customer_id, p_teller teller)
 {
-   pthread_mutex_lock(&mutex);
    printf("Customer %d is done with teller %d\n", customer_id, teller->id);
 
    teller->doing_service = 0;
+   pthread_mutex_lock(&mutex);
+   
    // re-enter teller into list
+   printf("do we ever get here?\n");
    
    if(!teller_list){
       teller_list = teller;
@@ -130,7 +134,7 @@ void* teller(void *arg)
             teller_check_out(me);
 
             // uncomment line below to let program terminate for testing
-            // return 0;
+             //return 0;
          } else {
             printf("teller %d checks in\n", me->id);
             teller_check_in(me);
